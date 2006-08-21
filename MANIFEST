@@ -1,0 +1,13 @@
+Build.PL
+lib/HTTP/Async.pm
+MANIFEST			This list of files
+t/bad-headers.t
+t/bad-hosts.t
+t/make-url-absolute.t
+t/poll-interval.t
+t/real-servers.t
+t/redirects.t
+t/template.t
+t/TestServer.pm
+t/timeout.t
+META.yml

@@ -1,0 +1,33 @@
+---
+name: HTTP-Async
+version: 0.01
+author:
+  - 'Edmund von der Burg <evdb@ecclestoad.co.uk>'
+abstract: process multiple HTTP requests in parallel without blocking.
+license: perl
+resources:
+  license: http://dev.perl.org/licenses/
+requires:
+  Carp: 0
+  Data::Dumper: 0
+  HTTP::Request: 0
+  HTTP::Response: 0
+  HTTP::Status: 0
+  IO::Select: 0
+  Net::HTTP: 0
+  Net::HTTP::NB: 0
+  Time::HiRes: 0
+  URI: 0
+build_requires:
+  HTTP::Server::Simple::CGI: 0
+  Module::Build: 0
+  Test::HTTP::Server::Simple: 0
+  Test::More: 0
+provides:
+  HTTP::Async:
+    file: lib/HTTP/Async.pm
+    version: 0.01
+generated_by: Module::Build version 0.28
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.2.html
+  version: 1.2
