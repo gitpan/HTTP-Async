@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp;
 use Data::Dumper;
@@ -84,11 +84,14 @@ C<select> lists.
 There are a number of default settings that should be suitable for most uses.
 However in some circumstances you might wish to change these.
 
-         slots: 20
-       timeout: 180 (seconds)
- max_redirects: 7
- poll_interval: 0.05 (seconds)
-
+            slots: 20
+          timeout: 180 (seconds)
+ max_request_time: 300 (seconds)
+    max_redirects: 7
+    poll_interval: 0.05 (seconds)
+       proxy_host: ''
+       proxy_port: ''
+       
 =head1 METHODS
 
 =head2 new
@@ -102,10 +105,16 @@ Creates a new HTTP::Async object and sets it up.
 sub new {
     my $class = shift;
     return bless {
-        slots         => 20,
-        max_redirects => 7,
-        timeout       => 180,
-        poll_interval => 0.05,
+
+        opts => {
+            slots            => 20,
+            max_redirects    => 7,
+            timeout          => 180,
+            max_request_time => 300,
+            poll_interval    => 0.05,
+        },
+
+        id_opts => {},
 
         to_send     => [],
         in_progress => {},
@@ -118,40 +127,56 @@ sub new {
 
 sub _next_id { return ++$_[0]->{current_id} }
 
-=head2 slots, timeout, poll_interval and max_redirects
+=head2 slots, timeout, max_request_time, poll_interval, max_redirects, proxy_host and proxy_port
 
     $old_value = $async->slots;
     $new_value = $async->slots( $new_value );
 
-Get/setters for the C<$async> objects config settings. Timeout is in seconds
-(and is restarted for redirects).
+Get/setters for the C<$async> objects config settings. Timeout is for
+inactivity and is in seconds.
 
 Slots is the maximum number of parallel requests to make.
 
 =cut
 
-sub slots {
+my %GET_SET_KEYS =
+  map { $_ => 1 }
+  qw( slots poll_interval
+  timeout max_request_time max_redirects
+  proxy_host proxy_port );
+
+sub _get_opt {
     my $self = shift;
-    $$self{slots} = shift if @_;
-    return $$self{slots};
+    my $key  = shift;
+    my $id   = shift;
+    die "$key not valid for _get_opt" unless $GET_SET_KEYS{$key};
+
+    # If there is an option set for this id then use that, otherwise fall back
+    # to the defaults.
+    return $self->{id_opts}{$id}{$key}
+      if $id && defined $self->{id_opts}{$id}{$key};
+
+    return $self->{opts}{$key};
+
 }
 
-sub timeout {
+sub _set_opt {
     my $self = shift;
-    $$self{timeout} = shift if @_;
-    return $$self{timeout};
+    my $key  = shift;
+    die "$key not valid for _set_opt" unless $GET_SET_KEYS{$key};
+    $self->{opts}{$key} = shift if @_;
+    return $self->{opts}{$key};
 }
 
-sub poll_interval {
-    my $self = shift;
-    $$self{poll_interval} = shift if @_;
-    return $$self{poll_interval};
-}
-
-sub max_redirects {
-    my $self = shift;
-    $$self{max_redirects} = shift if @_;
-    return $$self{max_redirects};
+foreach my $key ( keys %GET_SET_KEYS ) {
+    eval "
+    sub $key {
+        my \$self = shift;
+        return scalar \@_
+          ? \$self->_set_opt( '$key', \@_ )
+          : \$self->_get_opt( '$key' );
+    }
+    ";
 }
 
 =head2 add
@@ -171,13 +196,33 @@ sub add {
     my @returns = ();
 
     foreach my $req (@_) {
-        my $id = $self->_next_id;
-        push @{ $$self{to_send} }, [ $req, $id ];
-        push @returns, $id;
+        push @returns, $self->add_with_opts( $req, {} );
     }
-    $self->poke;
 
     return wantarray ? @returns : $returns[0];
+}
+
+=head2 add_with_opts
+
+    my $id = $async->add_with_opts( $request, \%opts );
+
+This method lets you add a single request to the queue with options that
+differ from the defaults. For example you might wish to set a longer timeout
+or to use a specific proxy. Returns the id of the request.
+
+=cut
+
+sub add_with_opts {
+    my $self = shift;
+    my $req  = shift;
+    my $opts = shift;
+    my $id   = $self->_next_id;
+
+    push @{ $$self{to_send} }, [ $req, $id ];
+    $self->{id_opts}{$id} = $opts;
+    $self->poke;
+
+    return $id;
 }
 
 =head2 poke
@@ -238,7 +283,7 @@ sub wait_for_next_response {
     my $self     = shift;
     my $wait_for = shift;
 
-    $wait_for = $self->timeout * $self->max_redirects
+    $wait_for = $self->max_request_time
       if !defined $wait_for;
 
     return $self->_next_response($wait_for);
@@ -259,11 +304,15 @@ sub _next_response {
           || time > $end_time;
 
         # sleep for the default sleep time.
+        # warn "sleeping for " . $self->poll_interval;
         sleep $self->poll_interval;
     }
 
     # If there is no result return false.
     return unless $resp_and_id;
+
+    # We have a response - delete the options for it from the store.
+    delete $self->{id_opts}{ $resp_and_id->[1] };
 
     # If we have a result return list or response depending on
     # context.
@@ -351,7 +400,13 @@ to help with debugging.
 
 sub DESTROY {
     my $self = shift;
-    carp "HTTP::Async object destroyed but still in use" if $self->total_count;
+
+    carp "HTTP::Async object destroyed but still in use"
+      if $self->total_count;
+
+    carp "INTERNAL ERROR: 'id_opts' not empty"
+      if scalar keys %{ $self->{id_opts} };
+
     return;
 }
 
@@ -369,8 +424,15 @@ sub _process_in_progress {
         my $hashref = $$self{in_progress}{$id};
         my $tmp     = $hashref->{tmp} ||= {};
 
+        # warn Dumper $hashref;
+
         # Check that we have not timed-out.
-        if ( time > $hashref->{timeout_at} ) {
+        if (   time > $hashref->{timeout_at}
+            || time > $hashref->{finish_by} )
+        {
+
+            # warn sprintf "Timeout: %.3f > %.3f",    #
+            #   time, $hashref->{timeout_at};
 
             $self->_add_error_response_to_return(
                 id       => $id,
@@ -388,23 +450,55 @@ sub _process_in_progress {
         # If there is a code then read the body.
         if ( $$tmp{code} ) {
             my $buf;
-            my $n = $s->read_entity_body( $buf, 1024 * 16 );
+            my $n = $s->read_entity_body( $buf, 1024 * 16 );    # 16kB
             $$tmp{is_complete} = 1 unless $n;
             $$tmp{content} .= $buf;
+
+            # warn "Received " . length( $buf ) ;
+
+            # Reset the timeout.
+            # warn( "reseting the timeout " . time );
+            $hashref->{timeout_at} = time + $self->_get_opt( 'timeout', $id );
 
             # warn $buf;
         }
 
         # If no code try to read the headers.
         else {
-            my ( $code, $message, %headers ) =
-              $s->read_response_headers( laxed => 1, junk_out => [] );
+            $s->flush;
+
+            my ( $code, $message, %headers );
+
+            eval {
+                ( $code, $message, %headers ) =
+                  $s->read_response_headers( laxed => 1, junk_out => [] );
+            };
+
+            if ($@) {
+                $self->_add_error_response_to_return(
+                    'code'     => 504,
+                    'content'  => $@,
+                    'id'       => $id,
+                    'request'  => $hashref->{request},
+                    'previous' => $hashref->{previous}
+                );
+                $self->_io_select->remove($s);
+                delete $$self{fileno_to_id}{ $s->fileno };
+                next HANDLE;
+            }
 
             if ($code) {
+
+                # warn "Got headers: $code $message " . time;
+
                 $$tmp{code}    = $code;
                 $$tmp{message} = $message;
                 my @headers_array = map { $_, $headers{$_} } keys %headers;
                 $$tmp{headers} = \@headers_array;
+
+                # Reset the timeout.
+                $hashref->{timeout_at} =
+                  time + $self->_get_opt( 'timeout', $id );
             }
         }
 
@@ -477,8 +571,13 @@ sub _send_request {
 
     my $uri = URI->new( $request->uri );
 
-    my $s =
-      eval { Net::HTTP::NB->new( Host => $uri->host, PeerPort => $uri->port ) };
+    my %args = ();
+
+    $args{Host}     = $uri->host;
+    $args{PeerAddr} = $self->_get_opt( 'proxy_host', $id ) || $uri->host;
+    $args{PeerPort} = $self->_get_opt( 'proxy_port', $id ) || $uri->port;
+
+    my $s = eval { Net::HTTP::NB->new(%args) };
 
     # We could not create a request - fake up a 503 response with
     # error as content.
@@ -503,10 +602,15 @@ sub _send_request {
 
     $self->_io_select->add($s);
 
-    $$self{fileno_to_id}{ $s->fileno }       = $id;
-    $$self{in_progress}{$id}{request}        = $request;
-    $$self{in_progress}{$id}{timeout_at}     = time + $self->timeout;
-    $$self{in_progress}{$id}{redirects_left} = $self->max_redirects
+    $$self{fileno_to_id}{ $s->fileno }   = $id;
+    $$self{in_progress}{$id}{request}    = $request;
+    $$self{in_progress}{$id}{timeout_at} =
+      time + $self->_get_opt( 'timeout', $id );
+    $$self{in_progress}{$id}{finish_by} =
+      time + $self->_get_opt( 'max_request_time', $id );
+
+    $$self{in_progress}{$id}{redirects_left} =
+      $self->_get_opt( 'max_redirects', $id )
       unless exists $$self{in_progress}{$id}{redirects_left};
 
     return 1;
@@ -559,6 +663,11 @@ sub _add_error_response_to_return {
 
 The responses may not come back in the same order as the requests were made.
 
+=head1 THANKS
+
+Egor Egorov contributed patches for proxies, catching connections that die
+before headers sent and more.
+
 =head1 AUTHOR
 
 Edmund von der Burg C<< <evdb@ecclestoad.co.uk> >>. 
@@ -598,5 +707,3 @@ POSSIBILITY OF SUCH DAMAGES.
 
 1;
 
-
-1;

@@ -1,0 +1,24 @@
+CHANGES to HTTP::Async
+
+0.02 - Wed Sep  6 09:36:01 BST 2006 - svn r30
+
+  * Changed the timeout to be an inactivity timeout and added a
+    max_request_length to limit the amount of time that a request can be
+    running for.
+
+  * Added more diagnostics to the tests to try to find the bug that is causing
+    MIYAGAWA issues.
+
+  * Created TODO and CHANGES docs.
+
+  * Added error checking to catch connections that fail before the headers are
+    sent. (patch submitted by Egor Egorov)
+
+  * Added ability to specify proxy to use. (based on patch from Egor Egorov)
+
+  * Added 'add_with_opts' method that lets you override the default options
+    for this request.
+
+0.01 - XXXXXXXXXX - svn r24
+
+   * Initial release onto CPAN.

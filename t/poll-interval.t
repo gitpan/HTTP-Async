@@ -2,9 +2,13 @@
 use strict;
 use warnings;
 
-use Test::More tests => 23;
+use Test::More tests => 24;
 use HTTP::Request;
 use Time::HiRes 'time';
+
+BEGIN {
+    require 't/test_utils.pl';
+}
 
 require 't/TestServer.pm';
 my $s        = TestServer->new;
@@ -24,60 +28,58 @@ is $q->poll_interval(0.1), 0.1, "set poll_interval to 0.1";
 is $q->poll_interval, 0.1, "\$q->poll_interval == 0.1";
 
 {
-    my $url = "$url_root?delay=3";
-    my $req = HTTP::Request->new( 'GET', $url );
-    ok $q->add($req), "Added request to the queue";
 
     # Get the time since the request was made.
-    my $start_time = time;
+    reset_timer();
+
+    my $url = "$url_root?delay=3";
+    my $req = HTTP::Request->new( 'GET', $url );
+    ok $q->add($req), "Added request to the queue - $url";
 
     # Does next_response return immediately
     ok !$q->next_response, "next_response returns at once";
-    ok time - $start_time < 0.1, "Returned quickly (less than 0.1 secs)";
+    delay_lt_ok 0.1, "Returned quickly (less than 0.1 secs)";
 
     ok !$q->wait_for_next_response(0),
       "wait_for_next_response(0) returns at once";
-    ok time - $start_time < 0.1, "Returned quickly (less than 0.1 secs)";
+    delay_lt_ok 0.1, "Returned quickly (less than 0.1 secs)";
 
     ok !$q->wait_for_next_response(1),
       "wait_for_next_response(1) returns after 1 sec without a response";
-    ok time - $start_time > 1 && time - $start_time < 1.1,
-      "Returned after 1 sec delay";
 
-    my $response = $q->wait_for_next_response(3);
+    delay_ge_ok 1,   "Returned after 1 sec delay";
+    delay_lt_ok 1.1, "Returned before 1.1 sec delay";
+
+    my $response = $q->wait_for_next_response();
     ok $response, "wait_for_next_response got the response";
-    ok time - $start_time > 3, "Returned after 3 sec delay";
+    delay_gt_ok 3, "Returned after 3 sec delay";
 
-    is $response->code, 200, "timed out (200)";
+    is $response->code, 200, "good response (200)";
     ok $response->is_success, "is a success";
 }
 
 {
+    reset_timer();
+
     my $url = "$url_root?delay=1";
     my $req = HTTP::Request->new( 'GET', $url );
-    ok $q->add($req), "Added request to the queue";
-
-    # Get the time since the request was made.
-    my $start_time = time;
+    ok $q->add($req), "Added request to the queue - $url";
 
     my $response = $q->wait_for_next_response;
-    ok $response, "wait_for_next_response got the response";
-    ok time - $start_time > 1, "Returned after 1 sec delay";
-    ok time - $start_time < 2, "Returned before 2 sec delay";
 
-    is $response->code, 200, "timed out (200)";
+    ok $response, "wait_for_next_response got the response";
+
+    delay_gt_ok 1, "Returned after 1 sec delay";
+    delay_lt_ok 2, "Returned before 2 sec delay";
+
+    is $response->code, 200, "good response (200)";
     ok $response->is_success, "is a success";
 }
 
-{
-
-    # Check that wait_for_next_response does not hang if there is nothing
-    # to wait for.
-
-    # Get the time since the request was made.
-    my $start_time = time;
-
+{    # Check that wait_for_next_response does not hang if there is nothing
+        # to wait for.
+    reset_timer();
     ok !$q->wait_for_next_response, "Did not get a response";
-
-    ok time - $start_time < 1, "Returned in less than 1 sec";
+    delay_lt_ok 1, "Returned in less than 1 sec";
 }
+

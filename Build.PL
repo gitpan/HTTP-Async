@@ -26,6 +26,8 @@ my $builder = Module::Build->new(
         'Module::Build'              => 0,
         'Test::HTTP::Server::Simple' => 0,
         'Test::More'                 => 0,
+        'URI::Escape'                => 0,
+        'LWP::UserAgent'             => 0,
     },
 );
 
