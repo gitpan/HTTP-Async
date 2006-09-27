@@ -1,12 +1,18 @@
 Build.PL
 CHANGES
 lib/HTTP/Async.pm
+lib/HTTP/Async/Polite.pm
+Makefile.PL
 MANIFEST			This list of files
 META.yml
+README
 t/bad-connections.t
 t/bad-headers.t
 t/bad-hosts.t
 t/make-url-absolute.t
+t/pod-coverage.t
+t/pod.t
+t/polite/polite.t
 t/poll-interval.t
 t/proxy.t
 t/real-servers.t

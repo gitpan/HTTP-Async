@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Carp;
 use Data::Dumper;
@@ -144,6 +144,12 @@ my %GET_SET_KEYS =
   qw( slots poll_interval
   timeout max_request_time max_redirects
   proxy_host proxy_port );
+
+sub _add_get_set_key {
+    my $class = shift;
+    my $key   = shift;
+    $GET_SET_KEYS{$key} = 1;
+}
 
 sub _get_opt {
     my $self = shift;
@@ -339,14 +345,12 @@ sub in_progress_count {
 }
 
 sub total_count {
-    my $self  = shift;
-    my $count = 0;
+    my $self = shift;
 
-    $self->poke;
-
-    $count += scalar @{ $$self{to_send} };
-    $count += scalar keys %{ $$self{in_progress} };
-    $count += scalar @{ $$self{to_return} };
+    my $count = 0                   #
+      + $self->to_send_count        #
+      + $self->in_progress_count    #
+      + $self->to_return_count;
 
     return $count;
 }
@@ -361,13 +365,12 @@ Prints a line describing what the current state is.
 
 sub info {
     my $self = shift;
-    $self->poke;
 
     return sprintf(
         "HTTP::Async status: %4u,%4u,%4u (send, progress, return)\n",
-        scalar @{ $$self{to_send} },
-        scalar keys %{ $$self{in_progress} },
-        scalar @{ $$self{to_return} }
+        $self->to_send_count,        #
+        $self->in_progress_count,    #
+        $self->to_return_count
     );
 }
 
@@ -399,19 +402,20 @@ to help with debugging.
 =cut
 
 sub DESTROY {
-    my $self = shift;
+    my $self  = shift;
+    my $class = ref $self;
 
-    carp "HTTP::Async object destroyed but still in use"
+    carp "$class object destroyed but still in use"
       if $self->total_count;
 
-    carp "INTERNAL ERROR: 'id_opts' not empty"
+    carp "$class INTERNAL ERROR: 'id_opts' not empty"
       if scalar keys %{ $self->{id_opts} };
 
     return;
 }
 
 # Go through all the values on the select list and check to see if
-# they have been fully recieved yet.
+# they have been fully received yet.
 
 sub _process_in_progress {
     my $self = shift;
@@ -538,7 +542,7 @@ sub _process_in_progress {
                 $hashref->{previous} = $response;
             }
             else {
-                push @{ $$self{to_return} }, [ $response, $id ];
+                $self->_add_to_return_queue( [ $response, $id ] );
                 delete $$self{in_progress}{$id};
             }
 
@@ -546,6 +550,13 @@ sub _process_in_progress {
         }
     }
 
+    return 1;
+}
+
+sub _add_to_return_queue {
+    my $self       = shift;
+    my $req_and_id = shift;
+    push @{ $$self{to_return} }, $req_and_id;
     return 1;
 }
 
@@ -652,12 +663,17 @@ sub _add_error_response_to_return {
     $response->request( $args{request} );
     $response->previous( $args{previous} ) if $args{previous};
 
-    push @{ $$self{to_return} }, [ $response, $args{id} ];
+    $self->_add_to_return_queue( [ $response, $args{id} ] );
     delete $$self{in_progress}{ $args{id} };
 
     return $response;
 
 }
+
+=head1 SEE ALSO
+
+L<HTTP::Async::Polite> - a polite form of this module. Slows the scraping down
+by domain so that the remote server is not overloaded.
 
 =head1 GOTCHAS
 

@@ -86,6 +86,12 @@ sub handle_request {
         }
     }
 
+    elsif ( my $id = $params->{set_time} ) {
+        my $now = time;
+        print $cgi->header( -nph => 1 );
+        print "$id\n$now\n";
+    }
+
     else {
         warn "DON'T KNOW WHAT TO DO: " . Dumper $params;
     }

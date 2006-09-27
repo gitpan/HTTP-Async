@@ -8,8 +8,6 @@ TODOs for HTTP::Async
 
   * Do what is needed to get CPANTS tests to pass / run.
 
-  * Fix the failing test case for Tatsuhiko Miyagawa.
-
   * Make sending non blocking - both the data and the initial DNS lookup.
 
   * Integrate the changes from Egor - set alarm to catch connection timeout.
@@ -18,3 +16,6 @@ TODOs for HTTP::Async
 
   * Add a max_content_size that will break connections if the content is to
     big - default is no limit.
+
+  * Switch to using Test::Class so that the tests are faster as they don't
+    spend so much time starting and stopping the test server(s).

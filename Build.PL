@@ -29,6 +29,12 @@ my $builder = Module::Build->new(
         'URI::Escape'                => 0,
         'LWP::UserAgent'             => 0,
     },
+
+    recursive_test_files => 1,
+
+    # Remember not to do anything too flash in Build.PL whilst this is set to
+    # 'traditional'. Should proabably change this to 'passthrough'.
+    create_makefile_pl => 'traditional',
 );
 
 $builder->create_build_script();

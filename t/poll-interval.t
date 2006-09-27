@@ -38,17 +38,17 @@ is $q->poll_interval, 0.1, "\$q->poll_interval == 0.1";
 
     # Does next_response return immediately
     ok !$q->next_response, "next_response returns at once";
-    delay_lt_ok 0.1, "Returned quickly (less than 0.1 secs)";
+    delay_lt_ok 0.4, "Returned quickly (less than 0.4 secs)";
 
     ok !$q->wait_for_next_response(0),
       "wait_for_next_response(0) returns at once";
-    delay_lt_ok 0.1, "Returned quickly (less than 0.1 secs)";
+    delay_lt_ok 0.4, "Returned quickly (less than 0.4 secs)";
 
     ok !$q->wait_for_next_response(1),
       "wait_for_next_response(1) returns after 1 sec without a response";
 
     delay_ge_ok 1,   "Returned after 1 sec delay";
-    delay_lt_ok 1.1, "Returned before 1.1 sec delay";
+    delay_lt_ok 1.4, "Returned before 1.4 sec delay";
 
     my $response = $q->wait_for_next_response();
     ok $response, "wait_for_next_response got the response";

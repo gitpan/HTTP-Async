@@ -1,5 +1,15 @@
 CHANGES to HTTP::Async
 
+0.03 - Wed Sep 27 11:00:14 BST 2006
+
+  * Created HTTP::Async::Polite that adds limits to the scraping to avoid over
+    stretching the domain being scraped.
+
+  * Increased the delay in poll-interval tests to stop them failing on slow
+    machines.
+
+  * Added pod tests, README and Makefile.PL in an attempt to achieve kwalitee.
+
 0.02 - Wed Sep  6 09:36:01 BST 2006 - svn r30
 
   * Changed the timeout to be an inactivity timeout and added a
