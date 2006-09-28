@@ -24,20 +24,22 @@ foreach my $s (@servers) {
 
 # Fire off three requests to two different servers. Check that the correct
 # interval is observed between each request and that the two different servers
-# were scaped in parallel.
+# were scaped in parallel. Also add another request so that the lists are not
+# balanced.
 my @urls =
   map {
     my $url_root = $_;
     my ($port) = $url_root =~ m/\d+$/g;
-    my @ret = map { "$url_root/?set_time=$port-$_" } 1 .. 3;
+    my $number = $_ eq $url_roots[0] ? 3 : 4;
+    my @ret = map { "$url_root/?set_time=$port-$_" } 1 .. $number;
     @ret;
   } @url_roots;
 
 my @requests = map { HTTP::Request->new( GET => $_ ) } @urls;
 ok $q->add(@requests), "Add the requests";
 
-is $q->to_send_count, 4, "Got correct to_send count";
-is $q->total_count,   6, "Got correct total count";
+is $q->to_send_count, 5, "Got correct to_send count";
+is $q->total_count,   7, "Got correct total count";
 
 # Get all the responses.
 my @responses = ();
@@ -45,13 +47,16 @@ while ( my $res = $q->wait_for_next_response ) {
     push @responses, $res;
 }
 
-is scalar(@responses), 6, "got six responses back";
+is scalar(@responses), 7, "got six responses back";
 
 # Extract the url and the timestamp from the responses;
 my %data = ();
 foreach my $res (@responses) {
     my ( $id, $timestamp ) = split /\n/, $res->content, 2;
     my ( $port, $number ) = split /-/, $id, 2;
+    
+    # Skip if the number is greater than 3 - extra req to test unbalanced list
+    next if $number > 3;
 
     s/\s+//g for $port, $number, $timestamp;
     $data{$port}{$number} = $timestamp;

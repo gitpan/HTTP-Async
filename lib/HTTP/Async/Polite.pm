@@ -4,7 +4,7 @@ use warnings;
 package HTTP::Async::Polite;
 use base 'HTTP::Async';
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Carp;
 use Data::Dumper;
@@ -126,6 +126,7 @@ sub _process_to_send {
     foreach my $domain ( keys %{ $self->{domain_stats} } ) {
 
         my $domain_stats = $self->{domain_stats}{$domain};
+        next unless scalar @{ $domain_stats->{to_send} };
 
         # warn "TRYING TO ADD REQUEST FOR $domain";
         # warn        sleep 5;

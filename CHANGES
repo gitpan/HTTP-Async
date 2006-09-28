@@ -1,5 +1,10 @@
 CHANGES to HTTP::Async
 
+0.04 - Thu Sep 28 13:42:25 BST 2006
+
+  * Fixed stupid bug that caused the polite module to crash if the numbers of
+    requests per domain were not the same.
+
 0.03 - Wed Sep 27 11:00:14 BST 2006
 
   * Created HTTP::Async::Polite that adds limits to the scraping to avoid over
