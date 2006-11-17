@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 16;
+use Test::More tests => 21;
 use HTTP::Request;
 
 require 't/TestServer.pm';
@@ -63,4 +63,19 @@ is $q->max_redirects, 7, "max_redirects == 7";
     is $res->code, 200, "No longer a redirect";
     ok $res->previous, "Has a previous reponse";
     is $res->previous->code, 302, "previous request was a redirect";
+}
+
+{    # Set the max_redirect to zero and check that none happen.
+
+    is $q->max_redirects(0), 0, "Set the max_redirects to zero.";
+    is $q->max_redirects, 0, "max_redirects is set to zero.";
+
+    my $url = "$url_root?redirect=20";
+    my $req = HTTP::Request->new( 'GET', $url );
+    ok $q->add($req), "Added request to the queue";
+    $q->poke while !$q->to_return_count;
+
+    my $res = $q->next_response;
+    is $res->code, 302, "No longer a redirect";
+    ok !$res->previous, "Have no previous reponse";
 }

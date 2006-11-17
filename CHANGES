@@ -1,5 +1,9 @@
 CHANGES to HTTP::Async
 
+0.05 - Fri Nov 17 08:42:49 GMT 2006
+
+  * Added ability to pass arguments to new to configure the async object.
+
 0.04 - Thu Sep 28 13:42:25 BST 2006
 
   * Fixed stupid bug that caused the polite module to crash if the numbers of

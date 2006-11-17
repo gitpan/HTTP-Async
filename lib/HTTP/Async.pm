@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
 use Data::Dumper;
@@ -96,15 +96,16 @@ However in some circumstances you might wish to change these.
 
 =head2 new
 
-    my $async = HTTP::Async->new;
+    my $async = HTTP::Async->new( %args );
 
-Creates a new HTTP::Async object and sets it up.
+Creates a new HTTP::Async object and sets it up. Variations from the default
+can be set by passing them in as C<%args>.
 
 =cut
 
 sub new {
     my $class = shift;
-    return bless {
+    my $self  = bless {
 
         opts => {
             slots            => 20,
@@ -123,6 +124,17 @@ sub new {
         current_id   => 0,
         fileno_to_id => {},
     }, $class;
+
+    $self->_init(@_);
+
+    return $self;
+}
+
+sub _init {
+    my $self = shift;
+    my %args = @_;
+    $self->_set_opt( $_ => $args{$_} ) for sort keys %args;
+    return $self;
 }
 
 sub _next_id { return ++$_[0]->{current_id} }

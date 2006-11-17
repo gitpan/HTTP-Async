@@ -4,7 +4,7 @@ use warnings;
 package HTTP::Async::Polite;
 use base 'HTTP::Async';
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
 use Data::Dumper;
@@ -63,6 +63,8 @@ sub new {
     # Set the interval between sends.
     $self->{opts}{send_interval} = 5;    # seconds
     $class->_add_get_set_key('send_interval');
+
+    $self->_init(@_);
 
     return $self;
 }
