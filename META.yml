@@ -1,6 +1,6 @@
 ---
 name: HTTP-Async
-version: 0.05
+version: 0.06
 author:
   - 'Edmund von der Burg <evdb@ecclestoad.co.uk>'
 abstract: process multiple HTTP requests in parallel without blocking.
@@ -28,7 +28,7 @@ build_requires:
 provides:
   HTTP::Async:
     file: lib/HTTP/Async.pm
-    version: 0.05
+    version: 0.06
   HTTP::Async::Polite:
     file: lib/HTTP/Async/Polite.pm
     version: 0.05

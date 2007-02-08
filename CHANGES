@@ -1,5 +1,11 @@
 CHANGES to HTTP::Async
 
+0.06 - Tue Feb  6 10:48:15 GMT 2007
+
+  * Changed the request uri that is used so that it has the host in for proxy
+    requests and does not otherwise. This is to comply with the RFC for HTTP
+    ( http://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html#sec5.1.2 ).
+
 0.05 - Fri Nov 17 08:42:49 GMT 2006
 
   * Added ability to pass arguments to new to configure the async object.

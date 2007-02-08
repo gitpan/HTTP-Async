@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Carp;
 use Data::Dumper;
@@ -596,9 +596,22 @@ sub _send_request {
 
     my %args = ();
 
+    # We need to use a different request_uri for proxied requests. Decide to use
+    # this if a proxy port or host is set.
+    #
+    #   http://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html#sec5.1.2
     $args{Host}     = $uri->host;
-    $args{PeerAddr} = $self->_get_opt( 'proxy_host', $id ) || $uri->host;
-    $args{PeerPort} = $self->_get_opt( 'proxy_port', $id ) || $uri->port;
+    $args{PeerAddr} = $self->_get_opt( 'proxy_host', $id );
+    $args{PeerPort} = $self->_get_opt( 'proxy_port', $id );
+
+    my $request_is_to_proxy =
+      ( $args{PeerAddr} || $args{PeerPort} )    # if either are set...
+      ? 1                                       # ...then we are a proxy request
+      : 0;                                      # ...otherwise not
+
+    # If we did not get a setting from the proxy then use the uri values.
+    $args{PeerAddr} ||= $uri->host;
+    $args{PeerPort} ||= $uri->port;
 
     my $s = eval { Net::HTTP::NB->new(%args) };
 
@@ -619,8 +632,14 @@ sub _send_request {
 
     my %headers = %{ $request->{_headers} };
 
+    # Decide what to use as the request_uri
+    my $request_uri =
+        $request_is_to_proxy # is this a proxy request....
+      ? $uri->as_string# ... if so use full url
+      : _strip_host_from_uri($uri);# ...else strip off scheme, host and port
+
     croak "Could not write request to $uri '$!'"
-      unless $s->write_request( $request->method, $uri->as_string, %headers,
+      unless $s->write_request( $request->method, $request_uri, %headers,
         $request->content );
 
     $self->_io_select->add($s);
@@ -637,6 +656,18 @@ sub _send_request {
       unless exists $$self{in_progress}{$id}{redirects_left};
 
     return 1;
+}
+
+sub _strip_host_from_uri {
+    my $uri = shift;
+
+    my $scheme_and_auth = quotemeta( $uri->scheme . '://' . $uri->authority );
+    my $url             = $uri->as_string;
+
+    $url =~ s/^$scheme_and_auth//;
+    $url = "/$url" unless $url =~ m{^/};
+
+    return $url;
 }
 
 sub _io_select {

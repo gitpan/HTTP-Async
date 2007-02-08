@@ -19,3 +19,6 @@ TODOs for HTTP::Async
 
   * Switch to using Test::Class so that the tests are faster as they don't
     spend so much time starting and stopping the test server(s).
+
+  * Change tests so that the port used is chosen so as not to conflict with a
+    port that is already in use.

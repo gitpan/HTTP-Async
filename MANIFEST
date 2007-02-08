@@ -18,6 +18,7 @@ t/proxy.t
 t/real-servers.t
 t/redirects.t
 t/setup.t
+t/strip_host_from_uri.t
 t/template.t
 t/test_utils.pl
 t/TestServer.pm

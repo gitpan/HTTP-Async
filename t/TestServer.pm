@@ -16,6 +16,14 @@ sub handle_request {
     # If we are on port 8081 then we are a proxy - we should forward the
     # requests.
     return act_as_proxy(@_) if $self->port == 8081;
+    
+    # We should act as a final destination server and so expect an absolute URL.
+    my $request_uri = $ENV{REQUEST_URI};
+      if ( $request_uri !~ m!^/! ){
+          warn "ERROR - not absolute request_uri '$request_uri'";
+          return;
+      }
+    
 
     # Flush the output so that it goes straight away. Needed for the timeout
     # trickle tests.
@@ -103,13 +111,25 @@ sub handle_request {
 sub act_as_proxy {
     my ( $self, $cgi ) = @_;
 
-    my $url      = $ENV{REQUEST_URI};
-    my $response = LWP::UserAgent->new( max_redirect => 0 )->get($url);
+    my $request_uri = $ENV{REQUEST_URI};
+
+    # According to the RFC the request_uri must be fully qualified if the
+    # request is to a proxy and absolute if it is to a destination server. CHeck
+    # that this is the case.
+    #
+    #   http://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html#sec5.1.2
+    if ( $request_uri !~ m!^http://! ){
+        warn "ERROR - not fully qualified request_uri '$request_uri'";
+        return;
+    }
+
+    my $response = LWP::UserAgent->new( max_redirect => 0 )->get($request_uri);
 
     # Add a header so that we know that this was proxied.
     $response->header( WasProxied => 'yes' );
 
     print $response->as_string;
+    return 1;
 }
 
 1;
