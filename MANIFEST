@@ -10,6 +10,7 @@ t/bad-connections.t
 t/bad-headers.t
 t/bad-hosts.t
 t/make-url-absolute.t
+t/not_modified.t
 t/pod-coverage.t
 t/pod.t
 t/polite/polite.t

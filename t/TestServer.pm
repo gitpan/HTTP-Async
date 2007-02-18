@@ -16,14 +16,13 @@ sub handle_request {
     # If we are on port 8081 then we are a proxy - we should forward the
     # requests.
     return act_as_proxy(@_) if $self->port == 8081;
-    
+
     # We should act as a final destination server and so expect an absolute URL.
     my $request_uri = $ENV{REQUEST_URI};
-      if ( $request_uri !~ m!^/! ){
-          warn "ERROR - not absolute request_uri '$request_uri'";
-          return;
-      }
-    
+    if ( $request_uri !~ m!^/! ) {
+        warn "ERROR - not absolute request_uri '$request_uri'";
+        return;
+    }
 
     # Flush the output so that it goes straight away. Needed for the timeout
     # trickle tests.
@@ -83,14 +82,12 @@ sub handle_request {
 
     elsif ( my $when = $params->{break_connection} ) {
 
-        while (1) {
+        for (1) {
             last if $when eq 'before_headers';
             print $cgi->header( -nph => 1 );
 
             last if $when eq 'before_content';
             print "content\n";
-
-            last;
         }
     }
 
@@ -98,6 +95,16 @@ sub handle_request {
         my $now = time;
         print $cgi->header( -nph => 1 );
         print "$id\n$now\n";
+    }
+
+    elsif ( exists $params->{not_modified} ) {
+        my $last_modified = HTTP::Date::time2str( time - 60 * 60 * 24 );
+        print $cgi->header(
+            -status         => '304',
+            -nph            => 1,
+            'Last-Modified' => $last_modified,
+        );
+        print "content\n";
     }
 
     else {
@@ -118,7 +125,7 @@ sub act_as_proxy {
     # that this is the case.
     #
     #   http://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html#sec5.1.2
-    if ( $request_uri !~ m!^http://! ){
+    if ( $request_uri !~ m!^http://! ) {
         warn "ERROR - not fully qualified request_uri '$request_uri'";
         return;
     }

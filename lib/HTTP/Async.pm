@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Carp;
 use Data::Dumper;
@@ -536,7 +536,12 @@ sub _process_in_progress {
             # If it was a redirect and there are still redirects left
             # create a new request and unshift it onto the 'to_send'
             # array.
-            if ( $response->is_redirect && $hashref->{redirects_left} > 0 ) {
+            if (
+                $response->is_redirect            # is a redirect
+                && $hashref->{redirects_left} > 0 # and we still want to follow
+                && $response->code != 304         # not a 'not modified' reponse
+              )
+            {
 
                 $hashref->{redirects_left}--;
 
@@ -633,10 +638,9 @@ sub _send_request {
     my %headers = %{ $request->{_headers} };
 
     # Decide what to use as the request_uri
-    my $request_uri =
-        $request_is_to_proxy # is this a proxy request....
-      ? $uri->as_string# ... if so use full url
-      : _strip_host_from_uri($uri);# ...else strip off scheme, host and port
+    my $request_uri = $request_is_to_proxy    # is this a proxy request....
+      ? $uri->as_string                       # ... if so use full url
+      : _strip_host_from_uri($uri);    # ...else strip off scheme, host and port
 
     croak "Could not write request to $uri '$!'"
       unless $s->write_request( $request->method, $request_uri, %headers,
@@ -726,6 +730,9 @@ The responses may not come back in the same order as the requests were made.
 
 Egor Egorov contributed patches for proxies, catching connections that die
 before headers sent and more.
+
+Tomohiro Ikebe from livedoor.jp submitted patches (and a test) to properly
+handle 304 responses.
 
 =head1 AUTHOR
 

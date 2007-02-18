@@ -1,5 +1,10 @@
 CHANGES to HTTP::Async
 
+0.07 - Sun Feb 18 15:00:46 GMT 2007
+
+  * Added proper handling of 304 responses based on code patch and test by
+    Tomohiro Ikebe from livedoor.jp
+
 0.06 - Tue Feb  6 10:48:15 GMT 2007
 
   * Changed the request uri that is used so that it has the host in for proxy

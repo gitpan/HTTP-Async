@@ -22,3 +22,7 @@ TODOs for HTTP::Async
 
   * Change tests so that the port used is chosen so as not to conflict with a
     port that is already in use.
+
+  * Change the user agent so that if it is not set in the request passed in then
+    it defaults to 'HTTP::Async vx.xx' or some such. Should also be possible to
+    set it in the opts.
