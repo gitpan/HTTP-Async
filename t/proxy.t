@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use URI::Escape;
 
-use Test::More 'no_plan';
+use Test::More tests => 16;
 use HTTP::Request;
 
 require 't/TestServer.pm';
@@ -31,7 +31,8 @@ foreach my $via_proxy ( 0, 1 ) {
 
         my %opts = ( proxy_host => '127.0.0.1', proxy_port => 8081, );
 
-        my $id = $via_proxy
+        my $id =
+            $via_proxy
           ? $q->add_with_opts( $req, \%opts )
           : $q->add($req);
 

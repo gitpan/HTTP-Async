@@ -1,38 +1,26 @@
----
-name: HTTP-Async
-version: 0.07
-author:
-  - 'Edmund von der Burg <evdb@ecclestoad.co.uk>'
-abstract: process multiple HTTP requests in parallel without blocking.
-license: perl
-resources:
-  license: http://dev.perl.org/licenses/
-requires:
-  Carp: 0
-  Data::Dumper: 0
-  HTTP::Request: 0
-  HTTP::Response: 0
-  HTTP::Status: 0
-  IO::Select: 0
-  Net::HTTP: 0
-  Net::HTTP::NB: 0
-  Time::HiRes: 0
-  URI: 0
-build_requires:
-  HTTP::Server::Simple::CGI: 0
-  LWP::UserAgent: 0
-  Module::Build: 0
-  Test::HTTP::Server::Simple: 0
-  Test::More: 0
-  URI::Escape: 0
-provides:
-  HTTP::Async:
-    file: lib/HTTP/Async.pm
-    version: 0.07
-  HTTP::Async::Polite:
-    file: lib/HTTP/Async/Polite.pm
-    version: 0.05
-generated_by: Module::Build version 0.28
+--- #YAML:1.0
+name:                HTTP-Async
+version:             0.08
+abstract:            ~
+license:             ~
+generated_by:        ExtUtils::MakeMaker version 6.32
+distribution_type:   module
+requires:     
+    Carp:                          0
+    Data::Dumper:                  0
+    HTTP::Request:                 0
+    HTTP::Response:                0
+    HTTP::Server::Simple::CGI:     0
+    HTTP::Status:                  0
+    IO::Select:                    0
+    LWP::UserAgent:                0
+    Net::HTTP:                     0
+    Net::HTTP::NB:                 0
+    Test::HTTP::Server::Simple:    0
+    Test::More:                    0
+    Time::HiRes:                   0
+    URI:                           0
+    URI::Escape:                   0
 meta-spec:
-  url: http://module-build.sourceforge.net/META-spec-v1.2.html
-  version: 1.2
+    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
+    version: 1.2

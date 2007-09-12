@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 11;
+use Test::More tests => 9;
 
 use HTTP::Request;
 
@@ -25,5 +25,4 @@ while ( $q->not_empty ) {
     ok !$res->is_success, "Response was not a success";
     ok $res->is_error, "Response was an error";
     ok $res->request,  "response has a request attached.";
-    is $res->code,     '503', 'response code is correct (503)';
 }

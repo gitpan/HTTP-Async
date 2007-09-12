@@ -5,14 +5,7 @@ without blocking.
 
 INSTALLATION
 
-To install with Module::Build, you can use the following commands:
-
-    perl Build.PL
-    ./Build
-    ./Build test
-    ./Build install
-
-If you don't have Module::Build you can run the following commands:
+To install you can use the following commands:
 
     perl Makefile.PL
     make

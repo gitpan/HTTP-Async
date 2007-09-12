@@ -25,4 +25,8 @@ TODOs for HTTP::Async
 
   * Change the user agent so that if it is not set in the request passed in then
     it defaults to 'HTTP::Async vx.xx' or some such. Should also be possible to
-    set it in the opts.
+    set it in the opts or in the HTTP::Request.
+
+  * Add 'info' sub that can be linked to SIGINFO to provide a summary of what is
+    going on eg "print $async->info( 'terse' )".
+

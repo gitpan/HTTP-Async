@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp;
 use Data::Dumper;
@@ -13,9 +13,6 @@ use Net::HTTP::NB;
 use Net::HTTP;
 use URI;
 use Time::HiRes qw( time sleep );
-
-# TODO: add 'info' sub that can be linked to SIGINFO to provide a
-# summary of what is going on eg "print $async->info( 'terse' )".
 
 =head1 NAME
 
