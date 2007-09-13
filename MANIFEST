@@ -12,7 +12,7 @@ t/make-url-absolute.t
 t/not_modified.t
 t/pod-coverage.t
 t/pod.t
-t/polite/polite.t
+t/polite.t
 t/poll-interval.t
 t/proxy.t
 t/real-servers.t
