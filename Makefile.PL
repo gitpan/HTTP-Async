@@ -6,6 +6,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'         => 'HTTP::Async',
     'VERSION_FROM' => 'lib/HTTP/Async.pm',
+    LICENSE      => 'perl',
     'PREREQ_PM'    => {
         'Carp'                       => 0,
         'Data::Dumper'               => 0,

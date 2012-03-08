@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use Carp;
 use Data::Dumper;
@@ -42,7 +42,7 @@ OR do something else if there is no response ready:
             # deal with $response
         } else {
             # do something else
-        {
+        }
     }
 
 OR just use the async object to fetch stuff in the background and deal with
@@ -148,9 +148,7 @@ Slots is the maximum number of parallel requests to make.
 
 =cut
 
-my %GET_SET_KEYS =
-  map { $_ => 1 }
-  qw( slots poll_interval
+my %GET_SET_KEYS = map { $_ => 1 } qw( slots poll_interval
   timeout max_request_time max_redirects
   proxy_host proxy_port );
 
@@ -427,15 +425,20 @@ sub DESTROY {
 # they have been fully received yet.
 
 sub _process_in_progress {
-    my $self = shift;
+    my $self     = shift;
+    my %seen_ids = ();
 
   HANDLE:
     foreach my $s ( $self->_io_select->can_read(0) ) {
 
-        my $id = $self->{fileno_to_id}{ $s->fileno };
-        die unless $id;
+        # Get the id and add it to the hash of seen ids so we don't check it
+        # later for errors.
+        my $id = $self->{fileno_to_id}{ $s->fileno }
+          || die "INTERNAL ERROR: could not got id for fileno";
+        $seen_ids{$id}++;
+
         my $hashref = $$self{in_progress}{$id};
-        my $tmp     = $hashref->{tmp} ||= {};
+        my $tmp = $hashref->{tmp} ||= {};
 
         # warn Dumper $hashref;
 
@@ -468,10 +471,6 @@ sub _process_in_progress {
             $$tmp{content} .= $buf;
 
             # warn "Received " . length( $buf ) ;
-
-            # Reset the timeout.
-            # warn( "reseting the timeout " . time );
-            $hashref->{timeout_at} = time + $self->_get_opt( 'timeout', $id );
 
             # warn $buf;
         }
@@ -509,11 +508,12 @@ sub _process_in_progress {
                 my @headers_array = map { $_, $headers{$_} } keys %headers;
                 $$tmp{headers} = \@headers_array;
 
-                # Reset the timeout.
-                $hashref->{timeout_at} =
-                  time + $self->_get_opt( 'timeout', $id );
             }
         }
+
+        # Reset the timeout.
+        $hashref->{timeout_at} = time + $self->_get_opt( 'timeout', $id );
+        # warn "recieved - timeout set to '$hashref->{timeout_at}'";
 
         # If the message is complete then create a request and add it
         # to 'to_return';
@@ -523,8 +523,7 @@ sub _process_in_progress {
 
             # warn Dumper $$hashref{content};
 
-            my $response =
-              HTTP::Response->new(
+            my $response = HTTP::Response->new(
                 @$tmp{ 'code', 'message', 'headers', 'content' } );
 
             $response->request( $hashref->{request} );
@@ -561,6 +560,41 @@ sub _process_in_progress {
             }
 
             delete $hashref->{tmp};
+        }
+    }
+
+    # warn Dumper(
+    #     {
+    #         in_progress => $self->{in_progress},
+    #         seen_ids    => \%seen_ids,
+    #     }
+    # );
+
+    foreach my $id ( keys %{ $self->{in_progress} } ) {
+
+        # skip this one if it was processed above.
+        next if $seen_ids{$id};
+
+        my $hashref = $self->{in_progress}{$id};
+
+        if (   time > $hashref->{timeout_at}
+            || time > $hashref->{finish_by} )
+        {
+
+            # warn Dumper( { hashref => $hashref, now => time } );
+
+            # we have a request that has timed out - handle it
+            $self->_add_error_response_to_return(
+                id       => $id,
+                code     => 504,
+                request  => $hashref->{request},
+                previous => $hashref->{previous},
+                content  => 'Timed out',
+            );
+
+            my $s = $hashref->{handle};
+            $self->_io_select->remove($s);
+            delete $$self{fileno_to_id}{ $s->fileno };
         }
     }
 
@@ -615,7 +649,16 @@ sub _send_request {
     $args{PeerAddr} ||= $uri->host;
     $args{PeerPort} ||= $uri->port;
 
-    my $s = eval { Net::HTTP::NB->new(%args) };
+    my $net_http_class = 'Net::HTTP::NB';
+    if ($uri->scheme and $uri->scheme eq 'https') {
+        $net_http_class = 'Net::HTTPS::NB';
+        eval {
+            require Net::HTTPS::NB;
+            Net::HTTPS::NB->import();
+        };
+        die "$net_http_class must be installed for https support" if $@;
+    }
+    my $s = eval { $net_http_class->new(%args) };
 
     # We could not create a request - fake up a 503 response with
     # error as content.
@@ -645,16 +688,23 @@ sub _send_request {
 
     $self->_io_select->add($s);
 
-    $$self{fileno_to_id}{ $s->fileno }   = $id;
-    $$self{in_progress}{$id}{request}    = $request;
-    $$self{in_progress}{$id}{timeout_at} =
-      time + $self->_get_opt( 'timeout', $id );
-    $$self{in_progress}{$id}{finish_by} =
-      time + $self->_get_opt( 'max_request_time', $id );
+    my $time = time;
+    my $entry = $$self{in_progress}{$id} ||= {};
 
-    $$self{in_progress}{$id}{redirects_left} =
-      $self->_get_opt( 'max_redirects', $id )
-      unless exists $$self{in_progress}{$id}{redirects_left};
+    $$self{fileno_to_id}{ $s->fileno } = $id;
+
+    $entry->{request}    = $request;
+    $entry->{started_at} = $time;
+
+    
+    $entry->{timeout_at} = $time + $self->_get_opt( 'timeout', $id );
+    # warn "sent - timeout set to '$entry->{timeout_at}'";
+
+    $entry->{finish_by}  = $time + $self->_get_opt( 'max_request_time', $id );
+    $entry->{handle}     = $s;
+
+    $entry->{redirects_left} = $self->_get_opt( 'max_redirects', $id )
+      unless exists $entry->{redirects_left};
 
     return 1;
 }
@@ -722,6 +772,7 @@ by domain so that the remote server is not overloaded.
 =head1 GOTCHAS
 
 The responses may not come back in the same order as the requests were made.
+For https requests to work, you must have L<Net::HTTPS::NB> installed.
 
 =head1 THANKS
 
@@ -730,6 +781,14 @@ before headers sent and more.
 
 Tomohiro Ikebe from livedoor.jp submitted patches (and a test) to properly
 handle 304 responses.
+
+Naveed Massjouni for adding the https handling code.
+
+=head1 BUGS AND REPO
+
+Please submit all bugs, patches etc on github
+
+L<https://github.com/evdb/HTTP-Async>
 
 =head1 AUTHOR
 

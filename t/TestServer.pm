@@ -28,7 +28,8 @@ sub handle_request {
     # trickle tests.
     $self->stdout_handle->autoflush(1);
 
-    # warn "START REQUEST - " . time;
+     # warn "START REQUEST - " . time;
+     # warn Dumper($params);
 
     # Do the right thing depending on what is asked of us.
     if ( exists $params->{redirect} ) {
@@ -49,15 +50,16 @@ sub handle_request {
         sleep( $params->{delay} );
         print $cgi->header( -nph => 1 );
         print "Delayed for '$params->{delay}'.\n";
-
     }
 
     elsif ( exists $params->{trickle} ) {
 
+        print $cgi->header( -nph => 1 );
+
         my $trickle_for = $params->{trickle};
         my $finish_at   = time + $trickle_for;
 
-        print $cgi->header( -nph => 1 );
+        local $| = 1;
 
         while ( time <= $finish_at ) {
             print time . " trickle $$\n";
