@@ -9,13 +9,21 @@ use Time::HiRes qw(sleep time);
 use Data::Dumper;
 use LWP::UserAgent;
 
+sub new {
+    my ($class, $port) = @_;
+    
+    $port ||= 10_249; # randomish port
+    
+    return $class->SUPER::new($port);
+}
+
 sub handle_request {
     my ( $self, $cgi ) = @_;
     my $params = $cgi->Vars;
 
     # If we are on port 8081 then we are a proxy - we should forward the
     # requests.
-    return act_as_proxy(@_) if $self->port == 8081;
+    return act_as_proxy(@_) if $self->{is_proxy};
 
     # We should act as a final destination server and so expect an absolute URL.
     my $request_uri = $ENV{REQUEST_URI};
