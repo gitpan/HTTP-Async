@@ -23,4 +23,5 @@ t/test_utils.pl
 t/TestServer.pm
 t/timeout.t
 TODO
-META.yml                                 Module meta-data (added by MakeMaker)
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)
