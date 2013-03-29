@@ -12,7 +12,11 @@ use LWP::UserAgent;
 sub new {
     my ($class, $port) = @_;
     
-    $port ||= 10_249; # randomish port
+    # Require a port parameter to be passed in.
+    # Any default here would mean the tests don't run properly in parallel.
+    if (!$port) {
+        die "Missing positional parameter 'port' required";
+    }
     
     return $class->SUPER::new($port);
 }
@@ -21,8 +25,8 @@ sub handle_request {
     my ( $self, $cgi ) = @_;
     my $params = $cgi->Vars;
 
-    # If we are on port 8081 then we are a proxy - we should forward the
-    # requests.
+    # If we should act as a proxy then the handle_request() behaviour is
+    # handled by act_as_proxy.
     return act_as_proxy(@_) if $self->{is_proxy};
 
     # We should act as a final destination server and so expect an absolute URL.
