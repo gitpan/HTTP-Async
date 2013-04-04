@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.14';
+our $VERSION = '0.16';
 
 use Carp;
 use Data::Dumper;
@@ -684,7 +684,10 @@ sub _send_request {
         return 1;
     }
 
-    my %headers = %{ $request->{_headers} };
+    my %headers;
+    for my $key ($request->{_headers}->header_field_names) {
+        $headers{$key} = $request->header($key);
+    }
 
     # Decide what to use as the request_uri
     my $request_uri = $request_is_to_proxy    # is this a proxy request....
@@ -741,16 +744,7 @@ sub _make_url_absolute {
     my $in  = $args{url};
     my $ref = $args{ref};
 
-    return $in if $in =~ m{ \A http:// }xms;
-
-    my $ret = $ref->scheme . '://' . $ref->authority;
-    return $ret . $in if $in =~ m{ \A / }xms;
-
-    $ret .= $ref->path;
-    return $ret . $in if $in =~ m{ \A [\?\#\;] }xms;
-
-    $ret =~ s{ [^/]+ \z }{}xms;
-    return $ret . $in;
+    return URI->new_abs($in, $ref)->as_string;
 }
 
 sub _add_error_response_to_return {
@@ -795,6 +789,9 @@ Naveed Massjouni for adding the https handling code.
 
 Alex Balhatchet for adding the https + proxy handling code, and for making the
 tests run ok in parallel.
+
+Josef Toman for fixing two bugs, one related to header handling and another
+related to producing an absolute URL correctly.
 
 =head1 BUGS AND REPO
 
