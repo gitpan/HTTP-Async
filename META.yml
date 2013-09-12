@@ -34,4 +34,6 @@ requires:
   Time::HiRes: 0
   URI: 0
   URI::Escape: 0
-version: 0.21
+resources:
+  repository: https://github.com/evdb/HTTP-Async
+version: 0.22
