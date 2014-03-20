@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use Carp;
 use Data::Dumper;
@@ -91,6 +91,9 @@ However in some circumstances you might wish to change these.
        local_addr:  ''
        local_port:  ''
        ssl_options: {}
+       cookie_jar:  undef
+
+If defined, is expected to be similar to C<HTTP::Cookies>, with extract_cookies and add_cookie_header methods.
        
 =head1 METHODS
 
@@ -113,6 +116,7 @@ sub new {
             timeout          => 180,
             max_request_time => 300,
             poll_interval    => 0.05,
+            cookie_jar       => undef,
         },
 
         id_opts => {},
@@ -139,7 +143,7 @@ sub _init {
 
 sub _next_id { return ++$_[0]->{current_id} }
 
-=head2 slots, timeout, max_request_time, poll_interval, max_redirects, proxy_host, proxy_port, local_addr, local_port, ssl_options
+=head2 slots, timeout, max_request_time, poll_interval, max_redirects, proxy_host, proxy_port, local_addr, local_port, ssl_options, cookie_jar
 
     $old_value = $async->slots;
     $new_value = $async->slots( $new_value );
@@ -153,7 +157,7 @@ Slots is the maximum number of parallel requests to make.
 
 my %GET_SET_KEYS = map { $_ => 1 } qw( slots poll_interval
   timeout max_request_time max_redirects
-  proxy_host proxy_port local_addr local_port ssl_options);
+  proxy_host proxy_port local_addr local_port ssl_options cookie_jar);
 
 sub _add_get_set_key {
     my $class = shift;
@@ -419,6 +423,65 @@ sub info {
     );
 }
 
+=head2 remove
+
+    $async->remove($id);
+    my $success = $async->remove($id);
+
+Removes the item with the given id no matter which state it is currently in. Returns true if an item is removed, and false otherwise.
+
+=cut
+
+sub remove {
+    my $self = shift;
+    my $id = shift;
+
+    my $hashref = delete $self->{in_progress}{$id};
+    if (!$hashref) {
+        for my $list ('to_send', 'to_return') {
+            my ($r_and_id) = grep { $_->[1] eq $id } @{ $self->{$list} };
+            $hashref = $r_and_id->[0];
+            if ($hashref) {
+                @{ $self->{$list} }
+                    = grep { $_->[1] ne $id } @{ $self->{$list} };
+            }
+        }
+    }
+    return if !$hashref;
+
+    my $s = $hashref->{handle};
+    $self->_io_select->remove($s);
+    delete $self->{id_opts}{$id};
+
+    return 1;
+}
+
+=head2 remove_all
+
+    $async->remove_all;
+    my $success = $async->remove_all;
+
+Removes all items no matter what states they are currently in. Returns true if any items are removed, and false otherwise.
+
+=cut
+
+sub remove_all {
+    my $self = shift;
+    return if $self->empty;
+
+    my @ids = (
+        (map { $_->[1] } @{ $self->{to_send} }),
+        (keys %{ $self->{in_progress} }),
+        (map { $_->[1] } @{ $self->{to_return} }),
+    );
+
+    for my $id (@ids) {
+        $self->remove($id);
+    }
+
+    return 1;
+}
+
 =head2 empty, not_empty
 
     while ( $async->not_empty ) { ...; }
@@ -567,13 +630,26 @@ sub _process_in_progress {
             $response->request( $hashref->{request} );
             $response->previous( $hashref->{previous} ) if $hashref->{previous};
 
+            # Deal with cookies
+            my $jar = $self->_get_opt('cookie_jar', $id);
+            if ($jar) {
+                $jar->extract_cookies($response);
+            }
+
             # If it was a redirect and there are still redirects left
             # create a new request and unshift it onto the 'to_send'
             # array.
+            # Only redirect GET and HEAD as per RFC  2616.
+            # http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
+            my $code = $response->code;
+            my $get_or_head = $response->request->method =~ m{^(?:GET|HEAD)$};
+
             if (
-                $response->is_redirect            # is a redirect
-                && $hashref->{redirects_left} > 0 # and we still want to follow
-                && $response->code != 304         # not a 'not modified' reponse
+                $response->is_redirect                     # is a redirect
+                && $hashref->{redirects_left} > 0          # and we still want to follow
+                && ($get_or_head || $code !~ m{^30[127]$}) # must be GET or HEAD if it's 301, 302 or 307
+                && $code != 304                            # not a 'not modified' reponse
+                && $code != 305                            # not a 'use proxy' response
               )
             {
 
@@ -587,7 +663,27 @@ sub _process_in_progress {
 
                 my $url = _make_url_absolute( url => $loc, ref => $uri );
 
-                my $request = HTTP::Request->new( 'GET', $url );
+                my $request = $response->request->clone;
+                $request->uri($url);
+
+                # These headers should never be forwarded
+                $request->remove_header('Host', 'Cookie');
+
+                # Don't leak private information.
+                # http://www.w3.org/Protocols/rfc2616/rfc2616-sec15.html#sec15.1.3
+                if ($request->header('Referer') &&
+                    $hashref->{request}->uri->scheme eq 'https' &&
+                    $request->uri->scheme eq 'http') {
+
+                    $request->remove_header('Referer');
+                }
+
+                # See Other should use GET
+                if ($code == 303 && !$get_or_head) {
+                    $request->method('GET');
+                    $request->content('');
+                    $request->remove_content_headers;
+                }
 
                 $self->_send_request( [ $request, $id ] );
                 $hashref->{previous} = $response;
@@ -669,6 +765,12 @@ sub _send_request {
     my $uri = URI->new( $request->uri );
 
     my %args = ();
+
+    # Get cookies from jar if one exists
+    my $jar = $self->_get_opt('cookie_jar', $id);
+    if ($jar) {
+        $jar->add_cookie_header($request);
+    }
 
     # We need to use a different request_uri for proxied requests. Decide to use
     # this if a proxy port or host is set.
