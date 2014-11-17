@@ -3,7 +3,7 @@ use warnings;
 
 package HTTP::Async;
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 use Carp;
 use Data::Dumper;
@@ -781,6 +781,12 @@ sub _send_request {
     $args{PeerPort} = $self->_get_opt( 'proxy_port', $id );
     $args{LocalAddr} = $self->_get_opt('local_addr', $id );
     $args{LocalPort} = $self->_get_opt('local_port', $id );
+
+    # https://rt.cpan.org/Public/Bug/Display.html?id=33071
+    $args{Timeout} = $self->_get_opt( 'timeout', $id);
+
+    # ACF - Pass ssl_options through
+    $args{ssl_opts} = $self->_get_opt( 'ssl_options', $id);
 
     my $request_is_to_proxy =
       ( $args{PeerAddr} || $args{PeerPort} )    # if either are set...

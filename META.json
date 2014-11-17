@@ -4,7 +4,7 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.141170",
+   "generated_by" : "ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.142690",
    "license" : [
       "perl_5"
    ],
@@ -58,5 +58,5 @@
          "url" : "https://github.com/evdb/HTTP-Async"
       }
    },
-   "version" : "0.26"
+   "version" : "0.27"
 }
